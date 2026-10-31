@@ -57,24 +57,26 @@ describe("tick",()=>{
         const result=tick(state);
         expect(result.time).toBe(1);
         expect(state.time).toBe(0);
+        expect(result.drivers).toEqual(drivers);
+        expect(result.orders).toEqual(orders);
     })
     it("assigns a created order to the nearest idle driver",()=>{
         const drivers: Driver[] = [makeDriver("Omar",3,3,"idle")];
         const orders: Order[] = [makeOrder("Shawarma",{x:3,y:4},{x:5,y:6},"created",0)];
         const state=makeState(0,drivers,orders);
         const result=tick(state);
-        expect(result.orders[0].status).toBe("assigned");
-        expect(result.orders[0].driverId).toBe("Omar");
-        expect(result.drivers[0].status).toBe("busy");
+        expect(result.orders[0]!.status).toBe("assigned");
+        expect(result.orders[0]!.driverId).toBe("Omar");
+        expect(result.drivers[0]!.status).toBe("busy");
     })
     it("leaves a created order unassigned when no idle driver is available",()=>{
         const drivers: Driver[] = [makeDriver("Omar",3,3,"busy")];
         const orders: Order[] = [makeOrder("Shawarma",{x:3,y:4},{x:5,y:6},"created",0)];
         const state=makeState(0,drivers,orders);
         const result=tick(state);
-        expect(result.orders[0].status).toBe("created");
-        expect(result.orders[0].driverId).toBeUndefined();
-        expect(result.drivers[0].status).toBe("busy");
+        expect(result.orders[0]!.status).toBe("created");
+        expect(result.orders[0]!.driverId).toBeUndefined();
+        expect(result.drivers[0]!.status).toBe("busy");
     })
     it("Two orders, one idle driver",()=>{
         const drivers: Driver[] = [makeDriver("Omar",3,3,"idle")];
@@ -83,11 +85,11 @@ describe("tick",()=>{
         ];
         const state=makeState(0,drivers,orders);
         const result=tick(state);
-        expect(result.orders[0].status).toBe("assigned");
-        expect(result.orders[1].status).toBe("created");
-        expect(result.orders[0].driverId).toBe("Omar");
-        expect(result.orders[1].driverId).toBeUndefined();
-        expect(result.drivers[0].status).toBe("busy");
+        expect(result.orders[0]!.status).toBe("assigned");
+        expect(result.orders[1]!.status).toBe("created");
+        expect(result.orders[0]!.driverId).toBe("Omar");
+        expect(result.orders[1]!.driverId).toBeUndefined();
+        expect(result.drivers[0]!.status).toBe("busy");
     })
     it("Two orders, two idle drivers",()=>{
         const drivers: Driver[] = [makeDriver("Omar",3,3,"idle"),
@@ -97,12 +99,12 @@ describe("tick",()=>{
         ];
         const state=makeState(0,drivers,orders);
         const result=tick(state);
-        expect(result.orders[0].status).toBe("assigned");
-        expect(result.orders[1].status).toBe("assigned");
-        expect(result.orders[0].driverId).toBe("Omar");
-        expect(result.orders[1].driverId).toBe("Slim");
-        expect(result.drivers[0].status).toBe("busy");
-        expect(result.drivers[1].status).toBe("busy");
+        expect(result.orders[0]!.status).toBe("assigned");
+        expect(result.orders[1]!.status).toBe("assigned");
+        expect(result.orders[0]!.driverId).toBe("Omar");
+        expect(result.orders[1]!.driverId).toBe("Slim");
+        expect(result.drivers[0]!.status).toBe("busy");
+        expect(result.drivers[1]!.status).toBe("busy");
     })//expect(result.orders.every(order => order.status === "assigned")).toBe(true); to check for both orders at once
     
     it("leaves orders that are not created unchanged", () => {
@@ -119,15 +121,15 @@ describe("tick",()=>{
         const state = makeState(0, drivers, orders);
         const result = tick(state);
 
-        expect(result.orders[0].status).toBe("assigned");
-        expect(result.orders[1].status).toBe("delivered");
-        expect(result.orders[2].status).toBe("cancelled");
+        expect(result.orders[0]!.status).toBe("assigned");
+        expect(result.orders[1]!.status).toBe("delivered");
+        expect(result.orders[2]!.status).toBe("cancelled");
 
-        expect(result.orders[0].driverId).toBe("Bodie");
-        expect(result.orders[1].driverId).toBe("Omar");
-        expect(result.orders[2].driverId).toBeUndefined();
+        expect(result.orders[0]!.driverId).toBe("Bodie");
+        expect(result.orders[1]!.driverId).toBe("Omar");
+        expect(result.orders[2]!.driverId).toBeUndefined();
 
-        expect(result.drivers[0].status).toBe("idle");
+        expect(result.drivers[0]!.status).toBe("idle");
     })
     it("Input state isn't mutated",()=>{
         const drivers: Driver[] = [makeDriver("Omar",3,3,"idle")];
@@ -140,10 +142,10 @@ describe("tick",()=>{
         expect(state.orders[0]!.status).toBe("created");
         expect(state.time).toBe(0);
         expect(result.time).toBe(1);
-        expect(result.drivers[0].status).toBe("busy");
-        expect(result.orders[0].status).toBe("assigned");
+        expect(result.drivers[0]!.status).toBe("busy");
+        expect(result.orders[0]!.status).toBe("assigned");
 
-    })//! here is called the non-null assertion operator. You're telling TypeScript: "I'm certain this value isn't undefined."
+    })
 
 })
 
