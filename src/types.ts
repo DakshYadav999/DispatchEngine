@@ -16,4 +16,11 @@ export type Order={
     dropoff:Point;
     status:OrderStatus;
     createdAt:number;
+    driverId?: string;
+}
+
+export type SimulationState={
+    time:number;
+    drivers: Driver[];
+    orders:Order[];
 }
