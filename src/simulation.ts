@@ -2,6 +2,14 @@ import { findNearestDriver } from "./assignment.js";
 import type { SimulationState, Order } from "./types.js";
 
 export function tick(state: SimulationState): SimulationState {
+    const result=assignOrders(state);
+    return {
+    ...result,
+    time: state.time + 1
+};
+}
+
+export function assignOrders(state:SimulationState):SimulationState{
     let workingDrivers = state.drivers;
     const updatedOrders: Order[] = [];
 
@@ -40,8 +48,14 @@ export function tick(state: SimulationState): SimulationState {
 
     return {
         ...state,
-        time: state.time + 1,
         drivers: workingDrivers,
         orders: updatedOrders
     };
 }
+
+export function advanceDeliveries(
+    state:SimulationState,
+    driverSpeed:number
+    ){
+}
+
