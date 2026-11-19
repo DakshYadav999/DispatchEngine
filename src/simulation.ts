@@ -1,12 +1,18 @@
 import { findNearestDriver } from "./assignment.js";
-import type { SimulationState, Order } from "./types.js";
+import type { SimulationState, Order,Driver } from "./types.js";
+import { moveToward } from "./geometry.js";
 
-export function tick(state: SimulationState): SimulationState {
-    const result=assignOrders(state);
+export function tick(
+    state: SimulationState,
+    driverSpeed: number = 1
+): SimulationState {
+    const assignedState = assignOrders(state);
+    const movedState = advanceDeliveries(assignedState, driverSpeed);
+
     return {
-    ...result,
-    time: state.time + 1
-};
+        ...movedState,
+        time: state.time + 1
+    };
 }
 
 export function assignOrders(state:SimulationState):SimulationState{
@@ -52,10 +58,79 @@ export function assignOrders(state:SimulationState):SimulationState{
         orders: updatedOrders
     };
 }
-
+//for...in gives you the array's index
+// for...of → actual elements.
 export function advanceDeliveries(
-    state:SimulationState,
-    driverSpeed:number
-    ){
-}
+    state: SimulationState,
+    driverSpeed: number
+): SimulationState {
 
+    let workingDrivers = state.drivers;
+    const updatedOrders: Order[] = [];
+
+    for (const order of state.orders) {
+
+        if (order.status !== "assigned" && order.status !== "picked_up") {
+            updatedOrders.push(order);
+            continue;
+        }
+
+        const driver = workingDrivers.find(
+            (driver) => driver.id === order.driverId
+        );
+
+        if (!driver) {
+            updatedOrders.push(order);
+            continue;
+        }
+
+        const target = order.status === "assigned"
+            ? order.pickup
+            : order.dropoff;
+
+        const newLocation = moveToward(
+            driver.location,
+            target,
+            driverSpeed
+        );
+
+        const arrived =
+            newLocation.x === target.x &&
+            newLocation.y === target.y;
+
+        let newOrderStatus:Order["status"] = order.status;
+        let newDriverStatus: Driver["status"] = driver.status;
+
+        if (order.status === "assigned" && arrived) {
+            newOrderStatus = "picked_up";
+            newDriverStatus = "busy";
+        }
+        else if (order.status === "picked_up" && arrived) {
+            newOrderStatus = "delivered";
+            newDriverStatus = "idle";
+        }
+
+        workingDrivers = workingDrivers.map((currentDriver) => {
+            if (currentDriver.id === driver.id) {
+                return {
+                    ...currentDriver,
+                    location: newLocation,
+                    status: newDriverStatus
+                };
+            }
+
+            return currentDriver;
+        });
+
+        updatedOrders.push({
+            ...order,
+            status: newOrderStatus
+        });
+    }
+
+    return {
+        ...state,
+        drivers: workingDrivers,
+        orders: updatedOrders
+    };
+}
