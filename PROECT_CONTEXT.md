@@ -1,144 +1,224 @@
-# DispatchLab: Project Context
+# DispatchLab — Project Context
 
-## Vision
+## 1. Project Vision
 
-A dispatch simulator: drivers and delivery orders on a map, assignment strategies compared with real measured metrics. Portfolio project for SDE-1.
+DispatchLab is a last-mile delivery dispatch simulator.
 
-## Stack
+The goal is to simulate drivers and delivery orders in a city-like environment, assign suitable drivers to orders, visualize their movement, and eventually compare different dispatch strategies using measurable performance metrics.
 
-- Engine: TypeScript, Vitest (current)
-- Frontend: React + Vite, canvas first, Leaflet later
-- Backend: Node + Express, PostgreSQL + Prisma, Socket.IO (later)
+**Project positioning:**
 
-## Current Structure
+A last-mile delivery dispatch simulator that evaluates driver assignment strategies under changing demand and fleet availability.
+
+The project is intended to demonstrate practical software engineering, TypeScript, backend fundamentals, simulation logic, and problem-solving for SDE-1 roles.
+
+## 2. Current Technology Stack
+
+### Current implementation
+- TypeScript
+- Node.js
+- Vitest
+- tsx
+
+### Planned technologies
+- React + TypeScript + Vite for the frontend
+- Leaflet + OpenStreetMap for map visualization
+- Node.js + Express + TypeScript for the backend
+- PostgreSQL + Prisma for persistence
+- Zod for validation
+- Socket.IO for real-time updates, if needed
+
+Do not introduce technologies just to make the project look more advanced. Add them when the project genuinely needs them.
+
+## 3. Current Project Structure
 
 ```text
 dispatch-engine/
-  src/
-    index.ts
-    geometry.ts          Point, distance, moveToward
-    geometry.test.ts     Geometry and movement tests
-    types.ts             Driver, Order, SimulationState, status unions
-    assignment.ts        findNearestDriver
-    assignment.test.ts   Assignment tests
-    simulation.ts        assignOrders, advanceDeliveries, tick
-    simulation.test.ts   Simulation tests
+├── src/
+│   ├── geometry.ts
+│   ├── types.ts
+│   ├── assignment.ts
+│   ├── simulation.ts
+│   ├── geometry.test.ts
+│   ├── assignment.test.ts
+│   └── simulation.test.ts
+├── package.json
+├── tsconfig.json
+└── PROJECT_CONTEXT.md
 ```
 
-## Decisions
+## 4. Core Types
 
-### Architecture
+### Point
+Represents a position in the simulation using `x` and `y` coordinates.
 
-- Engine is pure TypeScript with no web or Node specifics, so it can be reused by frontend and backend.
-- Strategies are pure functions that return a decision; the simulation applies it.
-- Ties are broken by array order (first wins) to keep runs deterministic.
-- ES modules; relative imports end in `.js`; `import type` for types.
-- Frontend before backend; Redis/Kafka/H3 only if a real need appears.
+### Driver
+Contains:
+- `id`
+- `location`
+- `status`
 
-### Assignment
+Driver statuses:
+- `idle`
+- `busy`
+- `offline`
 
-- `findNearestDriver` selects the nearest idle driver to an order's pickup.
-- Busy and offline drivers are ignored.
-- Orders are processed in array order.
-- Once assigned, a driver becomes busy and cannot receive another order until available again.
+### Order
+Contains:
+- `id`
+- `pickup`
+- `dropoff`
+- `status`
+- `createdAt`
+- Optional `driverId`
 
-### Movement
+Order statuses:
 
-- `moveToward(from, to, maxStep)` moves a point toward a target by at most `maxStep`.
-- It reuses `distance()` and uses a normalized direction vector.
-- It returns the exact target coordinates when the remaining distance is less than or equal to `maxStep`, preventing overshooting.
-- Movement functions return new Point objects and do not mutate their inputs.
+`created → assigned → picked_up → delivered`
 
-### Simulation Tick (Task 7 decision)
+Orders can also have a `cancelled` status.
 
-Each tick follows this fixed phase order:
+The order's `driverId` is the source of truth for its assigned driver. We do not maintain a separate `orderId` on the Driver.
 
-1. Assign waiting orders to available idle drivers.
-2. Move drivers toward their current targets.
-3. Update order and driver statuses when a driver arrives.
-4. Increment simulation time exactly once.
+### SimulationState
+Contains:
+- `time`
+- `drivers`
+- `orders`
 
-Consequences of this ordering:
+## 5. Implemented Functionality
 
-- A driver assigned during the current tick can start moving during that same tick.
-- A driver who delivers an order during the current tick cannot receive another order until the next tick because assignment has already happened.
-- A driver arriving at a pickup becomes `picked_up` but does not begin moving toward the dropoff until the next tick.
-- Arrival and pickup/delivery status changes take no additional time.
+### Geometry — `geometry.ts`
 
-### Order and Driver Relationship
+**`distance(a, b)`**
+- Calculates Euclidean distance between two points.
 
-- `order.driverId` identifies the driver assigned to an order.
-- The order is the source of truth for the driver-order relationship.
-- No `orderId` is added to the Driver type to avoid duplicating relationship state.
-- During delivery advancement, the driver is located using `order.driverId`.
-- If the referenced driver does not exist, the order is left unchanged rather than crashing.
+**`moveToward(from, to, maxStep)`**
+- Moves a point towards a target by at most `maxStep`.
+- Uses the distance function.
+- Calculates a normalized direction.
+- Prevents overshooting the destination.
+- Returns the exact target when the remaining distance is less than or equal to the maximum step.
+- Does not mutate the original points.
 
-### Status Transitions
+### Driver Assignment — `assignment.ts`
 
-```text
-created
-   |
-   v
-assigned
-   |
-   v
-picked_up
-   |
-   v
-delivered
+**`findNearestDriver(drivers, order)`**
+- Finds the nearest eligible idle driver to an order's pickup.
+- Ignores busy and offline drivers.
+- Returns `undefined` if no eligible driver exists.
+- Keeps the first driver in case of equal distances.
+
+### Simulation — `simulation.ts`
+
+**`assignOrders(state)`**
+- Processes orders with `created` status.
+- Finds the nearest idle driver.
+- Assigns the driver to the order.
+- Changes the order status to `assigned`.
+- Changes the driver's status to `busy`.
+- Handles multiple orders without assigning the same driver twice.
+- Does not increment simulation time.
+
+**`advanceDeliveries(state, driverSpeed)`**
+- Processes orders in `assigned` or `picked_up` status.
+- Finds the assigned driver using `driverId`.
+- Moves the driver towards the pickup when the order is `assigned`.
+- Moves the driver towards the dropoff when the order is `picked_up`.
+- Changes the order to `picked_up` when the driver reaches the pickup.
+- Changes the order to `delivered` when the driver reaches the dropoff.
+- Makes the driver `idle` after delivery.
+- Leaves orders unchanged if their assigned driver cannot be found.
+- Does not increment simulation time.
+
+**`tick(state, driverSpeed = 1)`**
+
+Combines the simulation phases in this order:
+
+1. Assign waiting orders.
+2. Move drivers and update delivery statuses.
+3. Increment simulation time once.
+
+### Important Tick Behaviour
+
+- A driver assigned during a tick can move towards the pickup in that same tick.
+- A driver reaching the pickup becomes `picked_up`; it does not start travelling towards the dropoff until the next tick.
+- A driver completing delivery becomes idle during the movement phase.
+- That driver can only receive another order in the following tick because assignment happens before movement.
+
+## 6. Engineering Decisions and Concepts Learned
+
+- The simulation engine uses TypeScript and is kept separate from the frontend.
+- Functions return updated state rather than mutating the original state.
+- Tests cover expected behaviour and edge cases.
+- Relative imports use `.js` extensions because the project uses NodeNext module resolution.
+- Type-only imports use `import type`.
+- `for...of` is used where sequential processing is important.
+- Optional properties are omitted when undefined. For example:
+
+```typescript
+...(driverId !== undefined ? { driverId } : {})
 ```
 
-- `created`: waiting for assignment.
-- `assigned`: driver is travelling toward the pickup.
-- `picked_up`: driver is travelling toward the dropoff.
-- `delivered`: driver has reached the dropoff and becomes idle.
-- `cancelled`: no movement or delivery processing.
+- The first eligible driver wins when distances are equal.
+- Driver assignment currently uses a greedy nearest-driver strategy.
+- Movement currently uses straight-line distance on a simple 2D coordinate grid.
 
-### Tick Function
+## 7. Current Progress
 
-- `tick(state, driverSpeed = 1)` advances the simulation by one time unit.
-- The default speed is 1.
-- `assignOrders` handles assignment without changing simulation time.
-- `advanceDeliveries` handles movement and arrival status changes without changing simulation time.
-- `tick` composes these functions and increments time once.
+| Task | Status |
+|---|---|
+| Project setup and TypeScript configuration | Complete |
+| Geometry and distance calculation | Complete |
+| Core types | Complete |
+| Nearest eligible driver assignment | Complete |
+| Simulation state and initial tick logic | Complete |
+| `moveToward()` and geometry tests | Complete |
+| Delivery lifecycle and movement integration | Complete |
 
-## Status
+**Task 7 is complete.** The simulation can now handle the full order journey from assignment through pickup and delivery, including driver reuse.
 
-**Completed:**
-- Project setup and TypeScript configuration.
-- Point type and distance calculation.
-- Driver, Order and SimulationState types.
-- `findNearestDriver` and its tests.
-- Initial simulation state and Task 5 assignment tick.
-- `moveToward` and its movement tests.
+The test suite and TypeScript typecheck have been run successfully.
 
-**In progress:**
-- Task 7: Refactor assignment into `assignOrders`.
-- Implement `advanceDeliveries`.
-- Update `tick` to compose assignment and delivery advancement.
-- Add movement, arrival, full-journey and immutability tests.
-- Update existing Task 5 tests to account for same-tick movement.
+## 8. Roadmap
 
-## Next
+The broader project direction is:
 
-Complete Task 7 and verify:
+1. Finish the core simulation engine.
+2. Build a visual 2D simulation showing drivers, orders, pickups, dropoffs, and movement.
+3. Add useful simulation metrics:
+   - Average delivery time
+   - Average pickup waiting time
+   - Driver utilization
+   - Unassigned orders
+   - Total distance travelled
+   - Driver workload distribution
+4. Compare the current greedy assignment strategy with a more advanced matching strategy.
+5. Test different scenarios, including peak demand and limited driver availability.
+6. Add backend APIs and persistence.
+7. Explore meaningful extensions such as demand-aware driver repositioning or dynamic batching when the core system is ready.
 
-- All tests pass.
-- TypeScript typecheck passes.
-- A complete journey from `(0,0)` to pickup `(3,0)` to dropoff `(3,4)` takes exactly 7 ticks at speed 1.
-- Inputs are never mutated.
+Follow the next task instructions before adding new functionality. Do not jump ahead.
 
-## Known Limitations
+## 9. Current Limitations
 
-- Straight-line distance on a flat grid, no roads.
-- Greedy nearest-driver assignment only.
-- No real GPS or traffic-aware ETA.
-- No concurrent order processing.
+- Uses a simple 2D coordinate grid, not real geographic roads.
+- Movement is straight-line rather than road-network-based.
+- Driver speed is fixed unless supplied to `tick`.
+- Assignment is greedy and does not guarantee globally optimal matching.
+- Does not currently model real traffic, GPS accuracy, or real-world ETA predictions.
 
-## Out of Scope for the MVP
+These are intentional simplifications for the current stage.
 
-- Authentication.
-- ML-based ETAs.
-- Real GPS integration.
-- Microservices.
-- Redis, Kafka and H3 unless a real need appears.
+## 10. Development Principles
+
+- Understand the problem before implementing a solution.
+- Keep the implementation aligned with the current task.
+- Avoid unnecessary abstractions and complexity.
+- Write tests for normal cases, edge cases, and state transitions.
+- Preserve immutability.
+- Understand every function rather than blindly copying code.
+- Prefer measurable improvements over adding technologies for appearance.
+- Keep the simulation engine independent of the UI.
+
+**Immediate next step:** Continue with the next task in the agreed Claude-guided roadmap, without expanding the scope prematurely.
