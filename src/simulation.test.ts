@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";  
 import type { SimulationState } from "./types.js";
-import { advanceDeliveries, tick } from "./simulation.js";
+import { advanceDeliveries, assignOrders, tick } from "./simulation.js";
 import type { Driver,Order } from "./types.js";
 import type { Point } from "./geometry.js";
 
@@ -150,6 +150,55 @@ describe("tick",()=>{
 
 })
 
+describe("assignOrders", () => {
+    it("assigns a created order and leaves time unchanged", () => {
+        const drivers: Driver[] = [
+            makeDriver("Omar", 0, 0, "idle")
+        ];
+
+        const orders: Order[] = [
+            makeOrder(
+                "Shawarma",
+                { x: 3, y: 0 },
+                { x: 8, y: 0 },
+                "created",
+                0
+            )
+        ];
+
+        const state = makeState(10, drivers, orders);
+
+        const result = assignOrders(state);
+
+        expect(result.orders[0]!.status).toBe("assigned");
+        expect(result.orders[0]!.driverId).toBe("Omar");
+        expect(result.drivers[0]!.status).toBe("busy");
+        expect(result.time).toBe(10);
+    });
+
+    it("does not mutate the original state", () => {
+        const state = makeState(
+            10,
+            [makeDriver("Omar", 0, 0, "idle")],
+            [
+                makeOrder(
+                    "Shawarma",
+                    { x: 3, y: 0 },
+                    { x: 8, y: 0 },
+                    "created",
+                    0
+                )
+            ]
+        );
+
+        const snapshot = structuredClone(state);
+
+        assignOrders(state);
+
+        expect(state).toEqual(snapshot);
+    });
+});
+
 describe("advanceDeliveries",()=>{
     it("A driver moves one step towards the pickup, while the order remains assigned",()=>{
         const drivers:Driver[]=[makeDriver("Omar",0,0,"busy")];
@@ -272,18 +321,58 @@ it("Allows a driver to take another order after delivery", () => {
     expect(state.orders[1]!.driverId).toBe("Omar");
     expect(state.drivers[0]!.status).toBe("busy");
 });
+it("Reaches a diagonal pickup in exactly 5 ticks", () => {
+    let state = makeState(
+        0,
+        [makeDriver("Omar", 0, 0, "busy")],
+        [
+            makeOrder(
+                "Diagonal Order",
+                { x: 3, y: 4 },
+                { x: 8, y: 9 },
+                "assigned",
+                0,
+                "Omar"
+            )
+        ]
+    );
+
+    let ticks = 0;
+
+    while (state.orders[0]!.status !== "picked_up" && ticks < 6) {
+        state = advanceDeliveries(state, 1);
+        ticks++;
+    }
+
+    expect(ticks).toBe(5);
+    expect(state.orders[0]!.status).toBe("picked_up");
+    expect(state.drivers[0]!.location).toEqual({ x: 3, y: 4 });
+});
 it("Does not move idle or offline drivers", () => {
     const drivers: Driver[] = [
-        makeDriver("Omar", 0, 0, "idle"),
-        makeDriver("Slim", 5, 5, "offline")
+        makeDriver("Omar", 0, 0, "busy"),
+        makeDriver("Slim", 10, 10, "idle"),
+        makeDriver("Max", 20, 20, "offline")
     ];
-    const orders: Order[] = [];
+
+    const orders: Order[] = [
+        makeOrder(
+            "Shawarma",
+            { x: 5, y: 0 },
+            { x: 10, y: 0 },
+            "assigned",
+            0,
+            "Omar"
+        )
+    ];
+
     const state = makeState(0, drivers, orders);
 
     const result = advanceDeliveries(state, 1);
 
-    expect(result.drivers[0]!.location).toEqual({x:0,y:0});
-    expect(result.drivers[1]!.location).toEqual({x:5,y:5});
+    expect(result.drivers[0]!.location).toEqual({ x: 1, y: 0 });
+    expect(result.drivers[1]!.location).toEqual({ x: 10, y: 10 });
+    expect(result.drivers[2]!.location).toEqual({ x: 20, y: 20 });
 });
 it("Does not mutate the original state", () => {
     const drivers: Driver[] = [makeDriver("Omar", 0, 0, "busy")];

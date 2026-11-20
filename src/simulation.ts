@@ -1,5 +1,6 @@
+
 import { findNearestDriver } from "./assignment.js";
-import type { SimulationState, Order,Driver } from "./types.js";
+import type { SimulationState, Order, Driver } from "./types.js";
 import { moveToward } from "./geometry.js";
 
 export function tick(
@@ -15,7 +16,7 @@ export function tick(
     };
 }
 
-export function assignOrders(state:SimulationState):SimulationState{
+export function assignOrders(state: SimulationState): SimulationState {
     let workingDrivers = state.drivers;
     const updatedOrders: Order[] = [];
 
@@ -58,25 +59,24 @@ export function assignOrders(state:SimulationState):SimulationState{
         orders: updatedOrders
     };
 }
-//for...in gives you the array's index
-// for...of → actual elements.
+
+// for...in gives array property keys as strings ("0", "1", etc.).
+// for...of gives the actual array elements.
 export function advanceDeliveries(
     state: SimulationState,
     driverSpeed: number
 ): SimulationState {
-
     let workingDrivers = state.drivers;
     const updatedOrders: Order[] = [];
 
     for (const order of state.orders) {
-
         if (order.status !== "assigned" && order.status !== "picked_up") {
             updatedOrders.push(order);
             continue;
         }
 
         const driver = workingDrivers.find(
-            (driver) => driver.id === order.driverId
+            (currentDriver) => currentDriver.id === order.driverId
         );
 
         if (!driver) {
@@ -98,14 +98,12 @@ export function advanceDeliveries(
             newLocation.x === target.x &&
             newLocation.y === target.y;
 
-        let newOrderStatus:Order["status"] = order.status;
+        let newOrderStatus: Order["status"] = order.status;
         let newDriverStatus: Driver["status"] = driver.status;
 
         if (order.status === "assigned" && arrived) {
             newOrderStatus = "picked_up";
-            newDriverStatus = "busy";
-        }
-        else if (order.status === "picked_up" && arrived) {
+        } else if (order.status === "picked_up" && arrived) {
             newOrderStatus = "delivered";
             newDriverStatus = "idle";
         }

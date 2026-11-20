@@ -207,7 +207,8 @@ Follow the next task instructions before adding new functionality. Do not jump a
 - Driver speed is fixed unless supplied to `tick`.
 - Assignment is greedy and does not guarantee globally optimal matching.
 - Does not currently model real traffic, GPS accuracy, or real-world ETA predictions.
-
+- An order assigned to a driver who no longer exists or goes offline during delivery can remain stuck indefinitely.
+- Driver reassignment and order cancellation for these situations are not implemented yet. This is planned for Task 15.
 These are intentional simplifications for the current stage.
 
 ## 10. Development Principles
