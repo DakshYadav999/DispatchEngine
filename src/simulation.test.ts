@@ -197,6 +197,26 @@ describe("assignOrders", () => {
 
         expect(state).toEqual(snapshot);
     });
+    it("ignores orders whose creation time has not arrived", () => {
+    const state = makeState(
+        3,
+        [makeDriver("Omar", 0, 0, "idle")],
+        [makeOrder("Future", { x: 1, y: 0 }, { x: 2, y: 0 }, "created", 5)]
+    );
+    const result = assignOrders(state);
+    expect(result.orders[0]!.status).toBe("created");
+    expect(result.orders[0]!.driverId).toBeUndefined();
+    expect(result.drivers[0]!.status).toBe("idle");
+});
+
+it("assigns an order once its creation time arrives", () => {
+    const state = makeState(
+        5,
+        [makeDriver("Omar", 0, 0, "idle")],
+        [makeOrder("Future", { x: 1, y: 0 }, { x: 2, y: 0 }, "created", 5)]
+    );
+    expect(assignOrders(state).orders[0]!.status).toBe("assigned");
+});
 });
 
 describe("advanceDeliveries",()=>{

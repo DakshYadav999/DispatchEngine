@@ -21,7 +21,7 @@ export function assignOrders(state: SimulationState): SimulationState {
     const updatedOrders: Order[] = [];
 
     for (const order of state.orders) {
-        if (order.status !== "created") {
+        if (order.status !== "created" || order.createdAt > state.time) {
             updatedOrders.push(order);
             continue;
         }
