@@ -408,3 +408,48 @@ it("Does not mutate the original state", () => {
     expect(state).toEqual(snapshot);
 });
 })
+describe("order timestamps", () => {
+    it("assignOrders stamps assignedAt with the current time", () => {
+        const state = makeState(
+            5,
+            [makeDriver("Omar", 0, 0, "idle")],
+            [makeOrder("o1", { x: 3, y: 0 }, { x: 8, y: 0 }, "created", 2)]
+        );
+        expect(assignOrders(state).orders[0]!.assignedAt).toBe(5);
+    });
+
+    it("advanceDeliveries stamps pickedUpAt and deliveredAt with the end-of-tick time", () => {
+        const pickup = advanceDeliveries(
+            makeState(
+                4,
+                [makeDriver("Omar", 4, 0, "busy")],
+                [makeOrder("o1", { x: 5, y: 0 }, { x: 10, y: 0 }, "assigned", 0, "Omar")]
+            ),
+            1
+        );
+        expect(pickup.orders[0]!.pickedUpAt).toBe(5);
+
+        const delivery = advanceDeliveries(
+            makeState(
+                9,
+                [makeDriver("Omar", 9, 0, "busy")],
+                [makeOrder("o1", { x: 2, y: 0 }, { x: 10, y: 0 }, "picked_up", 0, "Omar")]
+            ),
+            1
+        );
+        expect(delivery.orders[0]!.deliveredAt).toBe(10);
+    });
+
+    it("a full journey records assigned 0, picked up 3, delivered 7", () => {
+        let state = makeState(
+            0,
+            [makeDriver("Omar", 0, 0, "idle")],
+            [makeOrder("o1", { x: 3, y: 0 }, { x: 3, y: 4 }, "created", 0)]
+        );
+        for (let i = 0; i < 7; i++) state = tick(state, 1);
+        const order = state.orders[0]!;
+        expect(order.assignedAt).toBe(0);
+        expect(order.pickedUpAt).toBe(3);
+        expect(order.deliveredAt).toBe(7);
+    });
+});

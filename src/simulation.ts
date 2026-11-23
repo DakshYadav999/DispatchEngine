@@ -36,7 +36,8 @@ export function assignOrders(state: SimulationState): SimulationState {
         const assignedOrder: Order = {
             ...order,
             status: "assigned",
-            driverId: driver.id
+            driverId: driver.id,
+            assignedAt: state.time
         };
 
         workingDrivers = workingDrivers.map((currentDriver) => {
@@ -66,6 +67,7 @@ export function advanceDeliveries(
     state: SimulationState,
     driverSpeed: number
 ): SimulationState {
+    const completionTime = state.time + 1;
     let workingDrivers = state.drivers;
     const updatedOrders: Order[] = [];
 
@@ -88,11 +90,7 @@ export function advanceDeliveries(
             ? order.pickup
             : order.dropoff;
 
-        const newLocation = moveToward(
-            driver.location,
-            target,
-            driverSpeed
-        );
+        const newLocation = moveToward(driver.location, target, driverSpeed);
 
         const arrived =
             newLocation.x === target.x &&
@@ -100,12 +98,15 @@ export function advanceDeliveries(
 
         let newOrderStatus: Order["status"] = order.status;
         let newDriverStatus: Driver["status"] = driver.status;
+        let timestamps: { pickedUpAt?: number; deliveredAt?: number } = {};
 
         if (order.status === "assigned" && arrived) {
             newOrderStatus = "picked_up";
+            timestamps = { pickedUpAt: completionTime };
         } else if (order.status === "picked_up" && arrived) {
             newOrderStatus = "delivered";
             newDriverStatus = "idle";
+            timestamps = { deliveredAt: completionTime };
         }
 
         workingDrivers = workingDrivers.map((currentDriver) => {
@@ -116,13 +117,13 @@ export function advanceDeliveries(
                     status: newDriverStatus
                 };
             }
-
             return currentDriver;
         });
 
         updatedOrders.push({
             ...order,
-            status: newOrderStatus
+            status: newOrderStatus,
+            ...timestamps
         });
     }
 

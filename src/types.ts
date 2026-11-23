@@ -17,6 +17,9 @@ export type Order={
     status:OrderStatus;
     createdAt:number;
     driverId?: string;
+    assignedAt?: number;
+    pickedUpAt?: number;
+    deliveredAt?: number;
 }
 
 export type SimulationState={
