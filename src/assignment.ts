@@ -18,3 +18,26 @@ export function findNearestDriver(drivers:Driver[],order:Order):Driver | undefin
     }
     return best;
 }
+
+export type Assignment = { orderId: string; driverId: string };
+
+export type AssignmentStrategy = (
+    waitingOrders: Order[],
+    idleDrivers: Driver[],
+    time: number
+) => Assignment[];
+
+// Greedy: orders in array order (first come, first served), each takes the nearest free driver.
+export const nearestDriverStrategy: AssignmentStrategy = (waitingOrders, idleDrivers) => {
+    let available = idleDrivers;
+    const assignments: Assignment[] = [];
+
+    for (const order of waitingOrders) {
+        const driver = findNearestDriver(available, order);
+        if (driver === undefined) continue;
+        assignments.push({ orderId: order.id, driverId: driver.id });
+        available = available.filter((d) => d.id !== driver.id);
+    }
+
+    return assignments;
+};

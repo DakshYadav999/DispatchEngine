@@ -1,13 +1,14 @@
-
+import { nearestDriverStrategy, type AssignmentStrategy } from "./assignment.js";
 import { findNearestDriver } from "./assignment.js";
 import type { SimulationState, Order, Driver } from "./types.js";
 import { moveToward } from "./geometry.js";
 
 export function tick(
     state: SimulationState,
-    driverSpeed: number = 1
+    driverSpeed: number = 1,
+    strategy: AssignmentStrategy = nearestDriverStrategy
 ): SimulationState {
-    const assignedState = assignOrders(state);
+    const assignedState = assignOrders(state, strategy);
     const movedState = advanceDeliveries(assignedState, driverSpeed);
 
     return {
@@ -16,48 +17,55 @@ export function tick(
     };
 }
 
-export function assignOrders(state: SimulationState): SimulationState {
-    let workingDrivers = state.drivers;
-    const updatedOrders: Order[] = [];
+export function assignOrders(
+    state: SimulationState,
+    strategy: AssignmentStrategy = nearestDriverStrategy
+): SimulationState {
+    const waiting = state.orders.filter(
+        (o) => o.status === "created" && o.createdAt <= state.time
+    );
+    const idle = state.drivers.filter((d) => d.status === "idle");
 
-    for (const order of state.orders) {
-        if (order.status !== "created" || order.createdAt > state.time) {
-            updatedOrders.push(order);
-            continue;
+    if (waiting.length === 0 || idle.length === 0) {
+        return { ...state };
+    }
+
+    const assignments = strategy(waiting, idle, state.time);
+
+    // Never trust a strategy: check its answer before applying it.
+    const waitingIds = new Set(waiting.map((o) => o.id));
+    const idleIds = new Set(idle.map((d) => d.id));
+    const driverByOrder = new Map<string, string>();
+    const usedDrivers = new Set<string>();
+
+    for (const a of assignments) {
+        if (!waitingIds.has(a.orderId)) {
+            throw new Error(`Strategy assigned an order that is not waiting: ${a.orderId}`);
         }
-
-        const driver = findNearestDriver(workingDrivers, order);
-
-        if (!driver) {
-            updatedOrders.push(order);
-            continue;
+        if (!idleIds.has(a.driverId)) {
+            throw new Error(`Strategy assigned a driver that is not idle: ${a.driverId}`);
         }
-
-        const assignedOrder: Order = {
-            ...order,
-            status: "assigned",
-            driverId: driver.id,
-            assignedAt: state.time
-        };
-
-        workingDrivers = workingDrivers.map((currentDriver) => {
-            if (currentDriver.id === driver.id) {
-                return {
-                    ...currentDriver,
-                    status: "busy"
-                };
-            }
-
-            return currentDriver;
-        });
-
-        updatedOrders.push(assignedOrder);
+        if (driverByOrder.has(a.orderId)) {
+            throw new Error(`Strategy assigned order twice: ${a.orderId}`);
+        }
+        if (usedDrivers.has(a.driverId)) {
+            throw new Error(`Strategy assigned driver twice: ${a.driverId}`);
+        }
+        driverByOrder.set(a.orderId, a.driverId);
+        usedDrivers.add(a.driverId);
     }
 
     return {
         ...state,
-        drivers: workingDrivers,
-        orders: updatedOrders
+        drivers: state.drivers.map((d): Driver =>
+            usedDrivers.has(d.id) ? { ...d, status: "busy" } : d
+        ),
+        orders: state.orders.map((o): Order => {
+            const driverId = driverByOrder.get(o.id);
+            return driverId === undefined
+                ? o
+                : { ...o, status: "assigned", driverId, assignedAt: state.time };
+        })
     };
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { findNearestDriver } from "./assignment.js";
+import { findNearestDriver, nearestDriverStrategy } from "./assignment.js";
 import type {Driver,Order} from "./types.js";
 
 function makeDriver(
@@ -70,4 +70,27 @@ describe("findNearestDriver",()=>{
      
 
 
+});
+
+describe("nearestDriverStrategy", () => {
+    it("gives each order a different driver, earlier orders first", () => {
+        const drivers = [makeDriver("A", 0, 0, "idle"), makeDriver("B", 10, 0, "idle")];
+        const orders: Order[] = [
+            { id: "o1", pickup: { x: 1, y: 0 }, dropoff: { x: 2, y: 0 }, status: "created", createdAt: 0 },
+            { id: "o2", pickup: { x: 2, y: 0 }, dropoff: { x: 3, y: 0 }, status: "created", createdAt: 0 }
+        ];
+        expect(nearestDriverStrategy(orders, drivers, 0)).toEqual([
+            { orderId: "o1", driverId: "A" },
+            { orderId: "o2", driverId: "B" }
+        ]);
+    });
+
+    it("returns fewer assignments than orders when drivers run out", () => {
+        const drivers = [makeDriver("A", 0, 0, "idle")];
+        const orders: Order[] = [
+            { id: "o1", pickup: { x: 1, y: 0 }, dropoff: { x: 2, y: 0 }, status: "created", createdAt: 0 },
+            { id: "o2", pickup: { x: 2, y: 0 }, dropoff: { x: 3, y: 0 }, status: "created", createdAt: 0 }
+        ];
+        expect(nearestDriverStrategy(orders, drivers, 0)).toEqual([{ orderId: "o1", driverId: "A" }]);
+    });
 });

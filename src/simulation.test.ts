@@ -3,7 +3,7 @@ import type { SimulationState } from "./types.js";
 import { advanceDeliveries, assignOrders, tick } from "./simulation.js";
 import type { Driver,Order } from "./types.js";
 import type { Point } from "./geometry.js";
-
+import type { AssignmentStrategy } from "./assignment.js";
 
 function makeDriver(
     id:string,
@@ -451,5 +451,97 @@ describe("order timestamps", () => {
         expect(order.assignedAt).toBe(0);
         expect(order.pickedUpAt).toBe(3);
         expect(order.deliveredAt).toBe(7);
+    });
+});
+
+describe("assignOrders with custom strategies", () => {
+    const lastDriver: AssignmentStrategy = (orders, drivers) => {
+        const order = orders[0];
+        const driver = drivers[drivers.length - 1];
+        return order && driver ? [{ orderId: order.id, driverId: driver.id }] : [];
+    };
+
+    it("uses the strategy it is given", () => {
+        const state = makeState(
+            0,
+            [makeDriver("Near", 0, 0, "idle"), makeDriver("Far", 9, 9, "idle")],
+            [makeOrder("o1", { x: 1, y: 0 }, { x: 5, y: 5 }, "created", 0)]
+        );
+        const result = assignOrders(state, lastDriver);
+        expect(result.orders[0]!.driverId).toBe("Far");
+        expect(result.drivers[1]!.status).toBe("busy");
+        expect(result.drivers[0]!.status).toBe("idle");
+    });
+
+    it("gives the strategy only waiting orders, idle drivers and the time", () => {
+        const calls: { orders: string[]; drivers: string[]; time: number }[] = [];
+        const spy: AssignmentStrategy = (orders, drivers, time) => {
+            calls.push({
+                orders: orders.map((o) => o.id),
+                drivers: drivers.map((d) => d.id),
+                time
+            });
+            return [];
+        };
+        const state = makeState(
+            5,
+            [
+                makeDriver("A", 0, 0, "idle"),
+                makeDriver("B", 1, 1, "busy"),
+                makeDriver("C", 2, 2, "offline")
+            ],
+            [
+                makeOrder("ready", { x: 1, y: 1 }, { x: 2, y: 2 }, "created", 5),
+                makeOrder("future", { x: 1, y: 1 }, { x: 2, y: 2 }, "created", 9),
+                makeOrder("active", { x: 1, y: 1 }, { x: 2, y: 2 }, "assigned", 0, "B")
+            ]
+        );
+        assignOrders(state, spy);
+        expect(calls).toEqual([{ orders: ["ready"], drivers: ["A"], time: 5 }]);
+    });
+
+    it("rejects a strategy that assigns a non-idle driver", () => {
+        const bad: AssignmentStrategy = () => [{ orderId: "o1", driverId: "B" }];
+        const state = makeState(
+            0,
+            [makeDriver("A", 0, 0, "idle"), makeDriver("B", 1, 1, "busy")],
+            [makeOrder("o1", { x: 1, y: 1 }, { x: 2, y: 2 }, "created", 0)]
+        );
+        expect(() => assignOrders(state, bad)).toThrow();
+    });
+
+    it("rejects a strategy that uses one driver for two orders", () => {
+        const bad: AssignmentStrategy = () => [
+            { orderId: "o1", driverId: "A" },
+            { orderId: "o2", driverId: "A" }
+        ];
+        const state = makeState(
+            0,
+            [makeDriver("A", 0, 0, "idle"), makeDriver("B", 5, 5, "idle")],
+            [
+                makeOrder("o1", { x: 1, y: 1 }, { x: 2, y: 2 }, "created", 0),
+                makeOrder("o2", { x: 3, y: 3 }, { x: 4, y: 4 }, "created", 0)
+            ]
+        );
+        expect(() => assignOrders(state, bad)).toThrow();
+    });
+
+    it("rejects a strategy that names an unknown order", () => {
+        const bad: AssignmentStrategy = () => [{ orderId: "ghost", driverId: "A" }];
+        const state = makeState(
+            0,
+            [makeDriver("A", 0, 0, "idle")],
+            [makeOrder("o1", { x: 1, y: 1 }, { x: 2, y: 2 }, "created", 0)]
+        );
+        expect(() => assignOrders(state, bad)).toThrow();
+    });
+
+    it("tick passes the strategy through", () => {
+        const state = makeState(
+            0,
+            [makeDriver("Near", 0, 0, "idle"), makeDriver("Far", 9, 9, "idle")],
+            [makeOrder("o1", { x: 1, y: 0 }, { x: 5, y: 5 }, "created", 0)]
+        );
+        expect(tick(state, 1, lastDriver).orders[0]!.driverId).toBe("Far");
     });
 });

@@ -1,9 +1,11 @@
 import { tick } from "./simulation.js";
 import type { SimulationState } from "./types.js";
+import { nearestDriverStrategy, type AssignmentStrategy } from "./assignment.js";
 
 export type RunOptions = {
     maxTicks: number;
     driverSpeed?: number;
+    strategy?: AssignmentStrategy;
 };
 
 export type RunResult = {
@@ -22,7 +24,7 @@ export function runSimulation(
     initial: SimulationState,
     options: RunOptions
 ): RunResult {
-    const { maxTicks, driverSpeed = 1 } = options;
+    const { maxTicks, driverSpeed = 1 , strategy = nearestDriverStrategy } = options;
 
     if (!Number.isInteger(maxTicks) || maxTicks < 0) {
         throw new RangeError(`maxTicks must be a whole number >= 0, got ${maxTicks}`);
@@ -35,7 +37,7 @@ export function runSimulation(
     let state = initial;
 
     while (history.length - 1 < maxTicks && !isFinished(state)) {
-        state = tick(state, driverSpeed);
+        state = tick(state, driverSpeed, strategy);
         history.push(state);
     }
 
