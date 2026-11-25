@@ -407,6 +407,16 @@ it("Does not mutate the original state", () => {
 
     expect(state).toEqual(snapshot);
 });
+it("records idleSince at the end of the tick in which a delivery completes", () => {
+    const state = makeState(
+        9,
+        [makeDriver("Omar", 9, 0, "busy")],
+        [makeOrder("o1", { x: 2, y: 0 }, { x: 10, y: 0 }, "picked_up", 0, "Omar")]
+    );
+    const result = advanceDeliveries(state, 1);
+    expect(result.drivers[0]!.status).toBe("idle");
+    expect(result.drivers[0]!.idleSince).toBe(10);
+});
 })
 describe("order timestamps", () => {
     it("assignOrders stamps assignedAt with the current time", () => {

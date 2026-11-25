@@ -6,6 +6,7 @@ export type Driver={
     id:string;
     location:Point;
     status:DriverStatus;
+    idleSince?: number;
 }
 
 export type OrderStatus="created" | "assigned" | "picked_up" | "delivered" | "cancelled";

@@ -107,7 +107,8 @@ export function advanceDeliveries(
         let newOrderStatus: Order["status"] = order.status;
         let newDriverStatus: Driver["status"] = driver.status;
         let timestamps: { pickedUpAt?: number; deliveredAt?: number } = {};
-
+        let idleUpdate: { idleSince?: number } = {};
+        
         if (order.status === "assigned" && arrived) {
             newOrderStatus = "picked_up";
             timestamps = { pickedUpAt: completionTime };
@@ -115,6 +116,7 @@ export function advanceDeliveries(
             newOrderStatus = "delivered";
             newDriverStatus = "idle";
             timestamps = { deliveredAt: completionTime };
+            idleUpdate = { idleSince: completionTime };
         }
 
         workingDrivers = workingDrivers.map((currentDriver) => {
@@ -122,7 +124,8 @@ export function advanceDeliveries(
                 return {
                     ...currentDriver,
                     location: newLocation,
-                    status: newDriverStatus
+                    status: newDriverStatus,
+                    ...idleUpdate
                 };
             }
             return currentDriver;
